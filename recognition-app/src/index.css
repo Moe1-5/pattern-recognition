@@ -1,0 +1,162 @@
+*{
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+
+
+/* .first {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items:center;
+  background-color: white;
+} */
+
+#root {
+  height: 100vh;
+  background-image: linear-gradient(to right, #020024, #00d4ff);
+}
+
+.container {
+  width : 500px;
+  min-height: 550px;
+  position: relative;
+  top: 100px;
+  left: 500px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items:center;
+  background-color: aliceblue;
+  border-radius: 8px;
+}
+
+.login-container {
+  min-height: 400px;
+}
+
+form {
+  width: 80%;
+  margin-bottom: 50px;
+}
+
+
+.title {
+  text-align: center;
+  margin-top: 30px;
+  margin-bottom: 50px;
+}
+
+.input-container {
+    /* width: 100%; */
+    margin: 0 0 10px;
+}
+
+label {
+  font-family: 'Courier New', Courier, monospace;
+  margin-left: 5px;
+}
+
+input {
+  width: 100%;
+  height: 35px;
+  border: 1px solid;
+  outline: none;
+  text-indent : 15px;
+}
+
+#name, #password {
+  display : block;
+   border-radius: 10px;
+  
+}
+
+.lastname {
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px; 
+}
+
+.firstname {
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px; 
+}
+
+#username {
+  display: inline;
+  width: 50%;
+}
+
+.btn-box {
+  width: 100%;
+  margin-top:50px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;  
+  align-items: center;
+}
+
+.register-btn, .login-btn {
+  color: #fff;
+  padding: 10px 40px;
+  border-radius: 20px;
+  border: none;
+  background-color: rgb(35, 47, 45);
+  cursor: pointer;
+
+}
+
+.register-btn:focus, .login-btn:focus{
+  background-color: rgb(110, 198, 33);
+}
+
+.input-username, .input-password {
+  margin-top: 10px;
+  border-radius: 10px;
+}
+
+.new-link {
+  margin:15px 0 ;
+}
+
+.input-train {
+  width: 100%;
+}
+ 
+.error-msg {
+  text-align: center;
+  color: red;
+}
+
+.not-found-box {
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(157, 157, 157, 0.933);
+  display: flex;
+  font-style: italic;
+  font-weight: bold;
+  font-size: xx-large;
+  color: #555757af;
+  text-decoration:underline;
+  justify-content:center;
+  align-items: center;
+}
+
+.profile-name {
+  text-align: center;
+  box-shadow: 1px 1px 1px 1px;
+}
+
+.logout-btn {
+  margin: 25px;
+  width: 70%;
+  padding: 10px;
+
+}
+
+.logout-btn:focus{
+  background-color: rgb(255, 64, 64);
+  color :#fff;
+}
