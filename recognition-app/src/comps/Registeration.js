@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, NavLink } from "react-router-dom"
-
+import { useSnackbar } from 'notistack'
 
 function Registeration() {
 
@@ -8,38 +8,41 @@ function Registeration() {
   const [lastName, setLastName] = useState("")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
-  const [passwordError, setPasswordError] = useState("")
-  const [formError, setFormError] = useState("")
+  const [email, setEmail] = useState("")
   const dwellTime = []
   const elapsedspeed = []
   const navigate = useNavigate()
+  const { enqueueSnackbar } = useSnackbar()
 
   function passwordValidation() {
     if (password.length < 8) {
-      setPasswordError("the password must at least 8 characters long")
+      enqueueSnackbar("the password must at least 8 characters long", { variant: 'info' })
       return false
     } else if (!/[A-Z]/.test(password)) {
-      setPasswordError("the password must contain at least one uppercase letter")
+      enqueueSnackbar("the password must contain at least one uppercase letter", { variant: 'info' })
       return false
     } else if (!/[a-z]/.test(password)) {
-      setPasswordError("the password must contain at least one lowercase letter")
+      enqueueSnackbar("the password must contain at least one lowercase letter", { variant: 'info' })
       return false
     } else if (!/\d/.test(password)) {
-      setPasswordError("the password must conatin at least one digit")
+      enqueueSnackbar("the password must conatin at least one digit", { variant: 'info' })
       return false
     } else {
-      setPasswordError("")
       return true
     }
   }
   // later you must compare the username with the data to check if there is any similar accounts//
+  function emailValidation() {
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    return emailPattern.test(email);
+  }
 
   function formValidation() {
-    if (!firstName || !lastName || !username) {
-      setFormError('Please fill the empty fields')
+    if (!firstName || !lastName || !username || !email) {
+      enqueueSnackbar('Please fill the empty fields', { variant: 'info' })
       return false
     } else {
-      setFormError("")
       return true
     }
   }
@@ -52,43 +55,33 @@ function Registeration() {
     }
 
     const fullName = `${firstName} ${lastName}`;
-    const newUser = { fullName, username, password, dwellTime, elapsedspeed };
+    const newUser = { fullName, username, email, password, dwellTime, elapsedspeed };
 
 
 
     try {
-      const usersResponse = await fetch("http://localhost:5000/user");
-      if (!usersResponse.ok) {
-        throw new Error("Failed to fetch user data");
-      }
-      const users = await usersResponse.json();
-
-      const userExists = users.find(
-        (user) => user.fullName === fullName && user.username === username
-      );
-
-      if (userExists) {
-        setFormError("The user already exists. Please log in.");
-        return;
-      }
-
-      const addUserResponse = await fetch("http://localhost:5000/user", {
+      // make it also an axios post method for the registeration part 
+      const addUserResponse = await fetch("http://localhost:5555/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newUser),
       });
 
+      const responseJson = await addUserResponse.json();
+
       if (!addUserResponse.ok) {
         console.log(addUserResponse)
-        throw new Error("Failed to add new user");
+        enqueueSnackbar(`Errors : ${responseJson.message}`, { variant: 'error' });
+      } else if (addUserResponse.ok) {
+        enqueueSnackbar("you have Registered successfully", { variant: 'success' })
+        setFirstName(""); setLastName(""); setUsername(""); setPassword("");;
+        navigate("/")
       }
-      console.log("new user has been added")
-      setFirstName(""); setLastName(""); setUsername(""); setPassword(""); setFormError(""); setPasswordError("");
-      navigate("/")
+
 
     } catch (error) {
-      console.error("Error:", error.message);
-      // Handle errors here, such as displaying an error message to the user
+      enqueueSnackbar(`Error: ${error.massage}`, { variant: 'error' });
+      // Handle errors with notistick here, such as displaying an error message to the user
     }
   }
   return (
@@ -113,6 +106,17 @@ function Registeration() {
             placeholder="Enter your Last name"
           />
         </div>
+        {/* you may want to add an input for the user email so you can send him through it a second authentication */}
+        <div className="input-container">
+          {/* <label className="email"> E-Mail:</label> */}
+          <input
+            type="mail"
+            id="name"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your Email (example@gmail.com)" />
+
+        </div>
         <div className="input-container">
           {/* <label className="email"> E-Mail:</label> */}
           <input
@@ -133,8 +137,6 @@ function Registeration() {
             placeholder="Enter your password"
           />
         </div>
-        {formError && <p className="error-msg">{formError}</p>}
-        {passwordError && <p className='error-msg'>{passwordError}</p>}
         <div className="btn-box">
           <button className="register-btn">
             Register

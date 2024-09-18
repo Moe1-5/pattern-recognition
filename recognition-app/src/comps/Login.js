@@ -1,6 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { handleTypingSpeed, handleStartTime } from "./CalculateTyping";
+import { useSnackbar } from 'notistack'
+// be careful here with the code
+
+
 
 function Login() {
   const [formError, setFormError] = useState("");
@@ -13,7 +17,7 @@ function Login() {
   const [userExists, setUserExists] = useState(null);
   const [dwellTimes, setDwellTimes] = useState([]);
   const [keyPressTimes, setKeyPressTimes] = useState({});
-
+  const { enqueueSnackbar } = useSnackbar()
   useEffect(() => {
     if (typingStartTime && typingEndTime) {
       const timeInSeconds = (typingEndTime - typingStartTime) / 1000;
@@ -23,21 +27,50 @@ function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (username === "" || password === "") {
+      enqueueSnackbar("please fill the required fields", { variant: 'info' })
+      return
+    }
 
+    if (
+      localStorage.getItem("authToken") ||
+      localStorage.getItem("username") ||
+      localStorage.getItem("userId")
+    ) {
+      localStorage.removeItem("authToken")
+      localStorage.removeItem("username")
+      localStorage.removeItem("userId")
+
+    }
+
+    const data = { username, password }
     try {
-      const usersResponse = await fetch("http://localhost:5000/user");
+      const usersResponse = await fetch("http://localhost:5555/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(data),
+      });
       if (!usersResponse.ok) {
-        throw new Error("Failed to fetch user data");
+        const responseJson = await usersResponse.json()
+        enqueueSnackbar(`Error: ${responseJson.message}`, { variant: "error" })
+        resetForm()
+        return
       }
       const users = await usersResponse.json();
-      const user = users.find(
-        (user) => user.username === username && user.password === password
-      );
-      if (!user) {
-        setFormError("You don't have an account, Please Register");
+      const { user, token } = users
+
+      localStorage.setItem("authToken", token)
+      localStorage.setItem("username", username)
+      localStorage.setItem("userId", user.id)
+
+      // console.log("this is the important part" + user.id)
+
+      if (dwellTimes.length !== password.length) {
+        console.log("error in capturing timestamps")
         resetForm()
-        return;
       }
+      // console.log(`this is the dwell Time length ${dwellTimes.length}, and this is the password length ${password.length}`)
+
       handleTypingSpeed(
         e,
         typingStartTime,
@@ -49,10 +82,9 @@ function Login() {
       setFormError("");
       setUsername("");
       setPassword("");
-      const fetchedUserId = user.id;
 
       setTimeout(() => {
-        navigate("/train", { state: { userId: fetchedUserId } });
+        navigate("/home");
       }, 1000);
 
       setUserExists({ ...user });
@@ -72,7 +104,11 @@ function Login() {
   };
 
   const handleKeyUp = (e) => {
-    if (e.key === "Backspace") {
+    if (e.ctrlKey && e.key === "Backspace") {
+      setDwellTimes([]);
+      return;
+
+    } else if (e.key === "Backspace") {
       setDwellTimes((prevDwellTimes) => {
         const newDwellTimes = [...prevDwellTimes];
         newDwellTimes.pop();
@@ -84,16 +120,13 @@ function Login() {
         delete newTimes[newTimes[e.key]];
         return newTimes;
       });
-
     } else {
-
       const keyDownTime = keyPressTimes[e.key];
       if (keyDownTime) {
         const keyUpTime = Date.now();
         const dwellTime = keyUpTime - keyDownTime;
         console.log("Key:", e.key, "Dwell Time:", dwellTime);
         setDwellTimes((prevDwellTimes) => [...prevDwellTimes, dwellTime]);
-
         setKeyPressTimes((prevTimes) => {
           const newTimes = { ...prevTimes };
           delete newTimes[e.key];
@@ -112,6 +145,7 @@ function Login() {
         console.log(userExists.speed);
         console.log("dwellTimes2", dwellTimes);
         if (dwellTimes && dwellTimes.length > 0) {
+          //you mey need only these with the user.
           userExists.elapsedspeed.push(typingSpeed);
           userExists.dwellTime.push(dwellTimes);
           resetForm()
@@ -135,16 +169,23 @@ function Login() {
   const updateUser = useCallback(async () => {
     try {
       const response = await fetch(
-        `http://localhost:5000/user/${userExists.id}`,
+        `http://localhost:5555/login/${userExists.id}`,
         {
           method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(userExists),
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            dwellTime: userExists.dwellTime,
+            elapsedspeed: userExists.elapsedspeed,
+          }),
         }
       );
-
+      
       if (!response.ok) {
-        throw new Error("failed to update user data");
+        const responseJson = await response.json()
+        enqueueSnackbar(`Error: ${responseJson.message}`)
+        throw new Error("Failed to update user data, this is the response :", response.message);
       }
 
       const updatedUser = await response.json();
@@ -152,12 +193,15 @@ function Login() {
     } catch (error) {
       console.log("Error updating user:", error);
     }
-    // setUserExists(null)
-    // setDwellTimes([])
-    // setTypingStartTime(null)
-    // setTypingEndTime(null)
-    // setTypingSpeed(0)
+
+    // Optional: clean up state or perform other actions
+    // setUserExists(null);
+    // setDwellTimes([]);
+    // setTypingStartTime(null);
+    // setTypingEndTime(null);
+    // setTypingSpeed(0);
   }, [userExists]);
+
 
   useEffect(() => {
     if (userExists && typingSpeed > 0) {

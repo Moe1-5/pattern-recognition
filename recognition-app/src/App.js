@@ -5,6 +5,7 @@ import Login from "./comps/Login";
 import MachineTraining from "./comps/MachineTraining";
 import NotFound from "./comps/NotFound";
 import Home from "./comps/Home";
+import { ProtectedRoute } from "./comps/ProtectedRoutes"
 
 function App() {
   return (
@@ -13,8 +14,17 @@ function App() {
         <Routes>
           <Route exact path="/" element={< Login />} />
           <Route path="/register" element={<Registeration />} />
-          <Route path="/train" element={<MachineTraining />} />
-          <Route path="/home" element={<Home />} />
+          <Route path="/train" element={
+            <ProtectedRoute>
+              <MachineTraining />
+            </ProtectedRoute>
+
+          } />
+          <Route path="/home" element={
+            <ProtectedRoute>
+              <Home />
+            </ProtectedRoute>
+          } />
           <Route path="/*" element={<NotFound />} />
         </Routes>
       </Router>

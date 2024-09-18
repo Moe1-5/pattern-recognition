@@ -1,6 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { handleTypingSpeed, handleStartTime } from "./CalculateTyping";
-import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { enqueueSnackbar } from "notistack";
+
 
 function MachineTraining() {
   const [typingStartTime, setTypingStartTime] = useState(null)
@@ -9,12 +11,11 @@ function MachineTraining() {
   const [password, setPassword] = useState('')
   const [formError, setFormError] = useState('')
   const [userExists, setUserExists] = useState(null)
-  const location = useLocation()
-  const { userId } = location.state || {}
   const [dwellTimes, setDwellTimes] = useState([]);
   const [keyPressTimes, setKeyPressTimes] = useState({});
-
-
+  const userId = localStorage.getItem("userId")
+  const token = localStorage.getItem("authToken")
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (typingStartTime && typingEndTime) {
@@ -26,25 +27,47 @@ function MachineTraining() {
   const handleSubmit = async (e) => {
     console.log(typingSpeed)
     e.preventDefault()
+
+    if (!password) {
+      enqueueSnackbar("please fill the required field", { variant: "info" })
+      return
+    }
+
+
     try {
-      const userResponse = await fetch(`http://localhost:5000/user/${userId}`);
+      // axios, then the try and catch is not necessary 
+      const userResponse = await fetch(`http://localhost:5555/train/${userId}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ password })
+      });
+
+
       if (!userResponse.ok) {
-        throw new Error("Failed to fetch user data");
+        const responseJson = await userResponse.json()
+        enqueueSnackbar(`Error: ${responseJson.message}`, { variant: "error" })
+        resetForm()
+        throw new Error(responseJson.message);
       }
+
       const user = await userResponse.json();
       console.log(user)
 
-      if (user.password !== password) {
+      if (!user) {
         setFormError("Enter your correct password")
-        setTypingStartTime(null)
         resetForm()
+        // the error handling here 
+        setTypingStartTime(null)
         return;
       } else {
-
         handleTypingSpeed(e, typingStartTime, typingEndTime, setTypingStartTime, setTypingEndTime, setPassword)
         setFormError("");
         setPassword("");
         setUserExists({ ...user })
+        //message handling here 
       }
 
     } catch (err) {
@@ -62,7 +85,11 @@ function MachineTraining() {
   };
 
   const handleKeyUp = (e) => {
-    if (e.key === "Backspace") {
+    if (e.ctrlKey && e.key === "Backspace") {
+      setDwellTimes([]);
+      return;
+
+    } else if (e.key === "Backspace") {
       setDwellTimes((prevDwellTimes) => {
         const newDwellTimes = [...prevDwellTimes];
         newDwellTimes.pop();
@@ -74,16 +101,13 @@ function MachineTraining() {
         delete newTimes[newTimes[e.key]];
         return newTimes;
       });
-
     } else {
-
       const keyDownTime = keyPressTimes[e.key];
       if (keyDownTime) {
         const keyUpTime = Date.now();
         const dwellTime = keyUpTime - keyDownTime;
         console.log("Key:", e.key, "Dwell Time:", dwellTime);
         setDwellTimes((prevDwellTimes) => [...prevDwellTimes, dwellTime]);
-
         setKeyPressTimes((prevTimes) => {
           const newTimes = { ...prevTimes };
           delete newTimes[e.key];
@@ -92,6 +116,7 @@ function MachineTraining() {
       }
     }
   };
+
 
 
   const handlingSpeed = useCallback((typingSpeed) => {
@@ -122,13 +147,21 @@ function MachineTraining() {
 
   const updateUser = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:5000/user/${userId}`, {
+      const response = await fetch(`http://localhost:5555/train/${userId}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(userExists),
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          dwellTime: userExists.dwellTime,
+          elapsedspeed: userExists.elapsedspeed,
+        }),
       })
 
       if (!response.ok) {
+        const responseJson = await response.json()
+        enqueueSnackbar(`${responseJson.message}`, { variant: "error" })
         throw new Error("failed to update user data")
       }
 
@@ -165,7 +198,9 @@ function MachineTraining() {
 
   }, [userExists, updateUser, handlingSpeed, typingSpeed]);
 
-
+  const HomeRouteButton = () => {
+    navigate("/home")
+  }
 
   return (
     <div className="container login-container">
@@ -186,6 +221,9 @@ function MachineTraining() {
         <div className="btn-box">
           <button type="submit" className="login-btn">
             submit
+          </button>
+          <button className='login-btn home' onClick={() => HomeRouteButton()}>
+            Home
           </button>
           {formError && <p className="error-msg">{formError}</p>}
           <p>{typingSpeed}</p>
