@@ -58,6 +58,7 @@ function Login() {
       }
       const users = await usersResponse.json();
       const { user, token } = users
+      enqueueSnackbar(`${users.message}`, { variant: 'success' })
 
       localStorage.setItem("authToken", token)
       localStorage.setItem("username", username)
@@ -181,7 +182,7 @@ function Login() {
           }),
         }
       );
-      
+
       if (!response.ok) {
         const responseJson = await response.json()
         enqueueSnackbar(`Error: ${responseJson.message}`)

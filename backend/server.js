@@ -6,6 +6,7 @@ import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv';
 import processData from './mlModel.js'
+
 dotenv.config();
 
 const app = express()
@@ -99,7 +100,8 @@ app.post("/login", async (req, res) => {
 
         if (user.dwellTime !== undefined && user.dwellTime.length > 3) {
 
-            processData(filteredUser)
+            runTrainingPipeline(filteredUser);
+
         }
 
         if (isMatch) {
