@@ -1,9 +1,8 @@
 import * as tf from "@tensorflow/tfjs";
 
-// Step 1: Process Dwell Times (this code remains unchanged)
 function processDwellTimes(dwellTime) {
-    const numAttempts = dwellTime.length;        // Number of login attempts
-    const numElements = dwellTime[0].length;     // Number of key positions (elements)
+    const numAttempts = dwellTime.length;
+    const numElements = dwellTime[0].length;
 
     const sumVals = new Array(numElements).fill(0);
     const meanVals = new Array(numElements).fill(0);
@@ -41,13 +40,7 @@ function processDwellTimes(dwellTime) {
         attempt.map((value, j) => (value - meanVals[j]) / stdDevs[j])
     );
 
-    console.log(`this is the mean Value : ${meanVals}\n
-          and this is the minimum value : ${minVals}\n
-          and this is the maximum value : ${maxVals}\n
-           and this is the standard deviation : ${stdDevs}\n
-           while the last one is the standardized dwell time : ${standardizedDwellTimes}`);
-
-    return standardizedDwellTimes; // Return the standardized times for later use
+    return standardizedDwellTimes;
 }
 
 function calculateElapsed(elapsed) {
@@ -62,20 +55,22 @@ function calculateElapsed(elapsed) {
     return { meanVal, minVal, maxVal, stdDev };
 }
 
-export default function processData(data) {
+function processData(data) {
     const dwellTime = data.dwellTime;
     const elapsedspeed = data.elapsedspeed;
 
-    const standardizedDwellTimes = processDwellTimes(dwellTime);  // Preprocessing
+    const standardizedDwellTimes = processDwellTimes(dwellTime);
     const elapsedResults = calculateElapsed(elapsedspeed);
 
+    const combinedFeatures = standardizedDwellTimes.map((dwell, index) => {
+        return [...dwell, elapsedResults.meanVal, elapsedResults.minVal, elapsedResults.maxVal, elapsedResults.stdDev];
+    });
+
     return {
-        standardizedDwellTimes,  // Return standardized dwell times for training
-        elapsedResults
+        combinedFeatures,
     };
 }
 
-// Step 2: Splitting data into training and testing
 function splitData(inputData, labels, testSize = 0.2) {
     const numSamples = inputData.length;
     const testCount = Math.floor(numSamples * testSize);
@@ -104,7 +99,6 @@ function splitData(inputData, labels, testSize = 0.2) {
     };
 }
 
-// Step 3: Model creation and training
 function createModel(inputShape) {
     const model = tf.sequential();
     model.add(tf.layers.dense({ inputShape: [inputShape], units: 16, activation: 'relu' }));
@@ -135,18 +129,27 @@ async function evaluateModel(model, testInputs, testLabels) {
     console.log(`Test accuracy: ${result[1].dataSync()}`);
 }
 
-// Step 4: Putting it all together
-export function runTrainingPipeline(data) {
-    const { standardizedDwellTimes } = processData(data);  // Get preprocessed data
+async function runPrediction(data) {
+    const { combinedFeatures } = processData(data);
 
-    // Define labels for classification (1 = valid, 0 = invalid). Adjust this according to your dataset.
-    const labels = [1, 0, 1, 0, 1];  // Example labels, should match the size of the data
+    const labels = data.dwellTime.map(() => 1);
 
-    const { trainInputs, testInputs, trainLabels, testLabels } = splitData(standardizedDwellTimes, labels);
+    const { trainInputs, testInputs, trainLabels, testLabels } = splitData(combinedFeatures, labels);
 
-    const model = createModel(trainInputs.shape[1]);  // Input shape is the number of features
-    trainModel(model, trainInputs, trainLabels).then(() => {
-        evaluateModel(model, testInputs, testLabels);
-    });
+    const model = createModel(trainInputs.shape[1]);
+
+    await trainModel(model, trainInputs, trainLabels);
+
+    await evaluateModel(model, testInputs, testLabels);
+
+    const predictions = model.predict(testInputs);
+
+    const predictionArray = await predictions.array();
+
+    return predictionArray;
 }
+
+
+export default runPrediction
+
 

@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv';
-import processData from './mlModel.js'
+import runPrediction from './mlModel.js'
 
 dotenv.config();
 
@@ -79,8 +79,47 @@ app.post('/register', async (req, res) => {
 })
 
 
+// app.post("/login", async (req, res) => {
+//     const { username, password } = req.body;
+
+//     try {
+//         const user = await User.findOne({ username });
+
+//         if (!user) {
+//             return res.status(404).json({ message: "User not found" });
+//         }
+
+//         const isMatch = await bcrypt.compare(password, user.password);
+
+//         if (!isMatch) {
+//             return res.status(401).json({ message: "Invalid credentials" });
+//         }
+
+//         const filteredUser = {
+//             id: user.id,
+//             dwellTime: user.dwellTime || [],
+//             elapsedspeed: user.elapsedspeed || []
+//         };
+
+//         // Remove the initial prediction here. It will be handled in the PUT request.
+
+//         // Send back a success response for the login (without token generation yet)
+//         return res.status(200).json({
+//             message: "Login successful, awaiting behavior data for authentication",
+//             user: filteredUser
+//         });
+
+//     } catch (error) {
+//         console.error(error);
+//         return res.status(500).json({ message: "Server error" });
+//     }
+// });
+
+
+
 app.post("/login", async (req, res) => {
-    const { username, password } = req.body;
+    // const { id } = req.params;
+    const { username, password, dwellTime, elapsedspeed } = req.body;
 
     try {
         const user = await User.findOne({ username });
@@ -91,54 +130,47 @@ app.post("/login", async (req, res) => {
 
         const isMatch = await bcrypt.compare(password, user.password);
 
-
-        const filteredUser = {
-            id: user.id,
-            dwellTime: user.dwellTime,
-            elapsedspeed: user.elapsedspeed
-        }
-
-        if (user.dwellTime !== undefined && user.dwellTime.length > 3) {
-
-            runTrainingPipeline(filteredUser);
-
-        }
-
-        if (isMatch) {
-            const token = jwt.sign({ username: user.username }, process.env.SECRET_KEY, { expiresIn: "1h" })
-            return res.status(200).json({ message: "Login successful", user: filteredUser, token });
-        } else {
+        if (!isMatch) {
             return res.status(401).json({ message: "Invalid credentials" });
         }
 
+
+        const updatedData = {
+            dwellTime: user.dwellTime,
+            elapsedspeed: user.elapsedspeed,
+        }
+
+
+        if (dwellTime !== undefined) {
+            // Concatenate the new dwellTime (works for arrays)
+            updatedData.dwellTime = updatedData.dwellTime.concat(dwellTime);
+        }
+
+        if (elapsedspeed !== undefined) {
+            // Concatenate the new elapsed speed
+            updatedData.elapsedspeed = updatedData.elapsedspeed.concat(elapsedspeed);
+        }
+
+        // Now run the prediction with updated user data
+        const prediction = await runPrediction(updatedData);
+
+        console.log("this is the prediction : ", prediction)
+
+        if (prediction >= 0.5) {
+            // Grant authentication token and return success
+            await data.save();
+            const token = jwt.sign({ username: updateUser.username }, process.env.SECRET_KEY, { expiresIn: "1h" });
+            return res.status(200).json({ message: "Login successful", token });
+        } else {
+            // Deny login due to suspicious behavior
+            return res.status(403).json({ message: "Suspicious login behavior detected" });
+        }
     } catch (error) {
-        console.log(error);
+        console.log("Error updating user:", error);
         return res.status(500).json({ message: "Server error" });
     }
 });
 
-
-app.put("/login/:id", async (req, res) => {
-    const { id } = req.params
-    const { dwellTime, elapsedspeed } = req.body
-    const updateUser = await User.findById(id);
-
-    if (!updateUser) {
-        return res.status(404).json({ message: "User not found" })
-    }
-
-    if (dwellTime !== undefined) {
-        updateUser.dwellTime = dwellTime;
-    }
-
-    if (elapsedspeed !== undefined) {
-        updateUser.elapsedspeed = elapsedspeed;
-    }
-
-    await updateUser.save()
-    return res.status(200)
-
-})
 
 app.post("/train/:id", authenticateToken, async (req, res) => {
     const { id } = req.params

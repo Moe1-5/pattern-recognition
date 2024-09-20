@@ -43,35 +43,7 @@ function Login() {
 
     }
 
-    const data = { username, password }
     try {
-      const usersResponse = await fetch("http://localhost:5555/login", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(data),
-      });
-      if (!usersResponse.ok) {
-        const responseJson = await usersResponse.json()
-        enqueueSnackbar(`Error: ${responseJson.message}`, { variant: "error" })
-        resetForm()
-        return
-      }
-      const users = await usersResponse.json();
-      const { user, token } = users
-      enqueueSnackbar(`${users.message}`, { variant: 'success' })
-
-      localStorage.setItem("authToken", token)
-      localStorage.setItem("username", username)
-      localStorage.setItem("userId", user.id)
-
-      // console.log("this is the important part" + user.id)
-
-      if (dwellTimes.length !== password.length) {
-        console.log("error in capturing timestamps")
-        resetForm()
-      }
-      // console.log(`this is the dwell Time length ${dwellTimes.length}, and this is the password length ${password.length}`)
-
       handleTypingSpeed(
         e,
         typingStartTime,
@@ -80,19 +52,70 @@ function Login() {
         setTypingEndTime,
         setPassword
       );
-      setFormError("");
-      setUsername("");
-      setPassword("");
 
-      setTimeout(() => {
-        navigate("/home");
-      }, 1000);
+      console.log(dwellTimes)
 
-      setUserExists({ ...user });
+      setUserExists({
+        username: username,
+        password: password,
+        dwellTime: [],
+        elapsedspeed: []
+      });
 
     } catch (err) {
-      console.log("Error:", err);
+      console.log(err.message)
     }
+
+    //   try {
+
+    //     const usersResponse = await fetch("http://localhost:5555/login", {
+    //       method: "POST",
+    //       headers: { "content-type": "application/json" },
+    //       body: JSON.stringify(data),
+    //     });
+    //     if (!usersResponse.ok) {
+    //       const responseJson = await usersResponse.json()
+    //       enqueueSnackbar(`Error: ${responseJson.message}`, { variant: "error" })
+    //       resetForm()
+    //       return
+    //     }
+    //     const users = await usersResponse.json();
+    //     const { user, token } = users
+    //     enqueueSnackbar(`${users.message}`, { variant: 'success' })
+
+    //     localStorage.setItem("authToken", token)
+    //     localStorage.setItem("username", username)
+    //     localStorage.setItem("userId", user.id)
+
+    //     // console.log("this is the important part" + user.id)
+
+    //     if (dwellTimes.length !== password.length) {
+    //       console.log("error in capturing timestamps")
+    //       resetForm()
+    //     }
+    //     // console.log(`this is the dwell Time length ${dwellTimes.length}, and this is the password length ${password.length}`)
+
+    //     handleTypingSpeed(
+    //       e,
+    //       typingStartTime,
+    //       typingEndTime,
+    //       setTypingStartTime,
+    //       setTypingEndTime,
+    //       setPassword
+    //     );
+    //     setFormError("");
+    //     setUsername("");
+    //     setPassword("");
+
+    //     // setTimeout(() => {
+    //     //   navigate("/home");
+    //     // }, 1000);
+
+    //     setUserExists({ ...user });
+
+    //   } catch (err) {
+    //     console.log("Error:", err);
+    //   }
   };
 
   const handleKeyDown = (e) => {
@@ -169,39 +192,38 @@ function Login() {
 
   const updateUser = useCallback(async () => {
     try {
-      const response = await fetch(
-        `http://localhost:5555/login/${userExists.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            dwellTime: userExists.dwellTime,
-            elapsedspeed: userExists.elapsedspeed,
-          }),
-        }
-      );
+      const response = await fetch(`http://localhost:5555/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(userExists),
+      });
+
+      console.log(userExists.dwellTime, userExists.elapsedspeed)
 
       if (!response.ok) {
-        const responseJson = await response.json()
-        enqueueSnackbar(`Error: ${responseJson.message}`)
-        throw new Error("Failed to update user data, this is the response :", response.message);
+        const responseJson = await response.json();
+        enqueueSnackbar(`Error: ${responseJson.message}`, { variant: 'error' });
+        resetForm()
+        return
       }
 
-      const updatedUser = await response.json();
-      console.log("User updated successfully", updatedUser);
+      const responseJson = await response.json();
+      enqueueSnackbar(responseJson.message, { variant: 'success' });
+
+      // If the login is successful, store the token and navigate to home
+      if (responseJson.token) {
+        localStorage.setItem("authToken", responseJson.token);
+        navigate("/home");
+        resetForm()
+      }
+
+
     } catch (error) {
       console.log("Error updating user:", error);
     }
-
-    // Optional: clean up state or perform other actions
-    // setUserExists(null);
-    // setDwellTimes([]);
-    // setTypingStartTime(null);
-    // setTypingEndTime(null);
-    // setTypingSpeed(0);
-  }, [userExists]);
+  }, [userExists, dwellTimes, typingSpeed]);
 
 
   useEffect(() => {
@@ -252,5 +274,4 @@ function Login() {
     </div>
   );
 }
-
 export default Login;
