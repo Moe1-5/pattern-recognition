@@ -119,46 +119,121 @@ function Login() {
   };
 
   const handleKeyDown = (e) => {
+    // Only record time if an alphanumeric key is pressed
     if (/^[a-zA-Z0-9]$/.test(e.key)) {
+      const currentTime = Date.now();
+
+      // Calculate the time difference from the last key press
+      const previousKeyPressTime = Object.values(keyPressTimes).slice(-1)[0];
+      const timeDifference = previousKeyPressTime ? currentTime - previousKeyPressTime : 0;
+
+      // Log the current time in minutes, seconds, and milliseconds
+      const date = new Date(currentTime);
+      const minutes = date.getMinutes();
+      const seconds = date.getSeconds();
+      const milliseconds = date.getMilliseconds();
+      console.log(`Current Time: ${minutes}m ${seconds}s ${milliseconds}ms`);
+
+      // Log the time difference only if there's a previous key press
+      if (previousKeyPressTime) {
+        const diffMinutes = Math.floor(timeDifference / 60000);
+        const diffSeconds = Math.floor((timeDifference % 60000) / 1000);
+        const diffMilliseconds = timeDifference % 1000;
+
+        console.log(`Time Difference: ${diffMinutes}m ${diffSeconds}s ${diffMilliseconds}ms`);
+
+        // Add the time difference to the dwellTime state
+        setDwellTimes((prevDwellTimes) => {
+          return [...prevDwellTimes, timeDifference];
+        });
+      }
+
+      // Store the timestamp for the current key press
       setKeyPressTimes((prevTimes) => ({
         ...prevTimes,
-        [e.key]: Date.now(),
+        [e.key]: currentTime,
       }));
     }
-  };
 
-  const handleKeyUp = (e) => {
-    if (e.ctrlKey && e.key === "Backspace") {
-      setDwellTimes([]);
-      return;
+    // Handle Backspace and Ctrl + Backspace
+    if (e.key === 'Backspace') {
+      if (e.ctrlKey) {
+        // Clear all dwell times if Ctrl + Backspace is pressed
+        setDwellTimes([]);
+        console.log('All time differences cleared!');
+        setKeyPressTimes({}); // Clear all key press times
+      } else {
+        // Remove the last dwell time if it exists
+        setDwellTimes((prevDwellTimes) => {
+          if (prevDwellTimes.length > 0) {
+            return prevDwellTimes.slice(0, -1); // Remove the last dwell time
+          }
+          return prevDwellTimes; // Return unchanged if there's nothing to remove
+        });
 
-    } else if (e.key === "Backspace") {
-      setDwellTimes((prevDwellTimes) => {
-        const newDwellTimes = [...prevDwellTimes];
-        newDwellTimes.pop();
-        return newDwellTimes;
-      });
-
-      setKeyPressTimes((prevTimes) => {
-        const newTimes = { ...prevTimes };
-        delete newTimes[newTimes[e.key]];
-        return newTimes;
-      });
-    } else {
-      const keyDownTime = keyPressTimes[e.key];
-      if (keyDownTime) {
-        const keyUpTime = Date.now();
-        const dwellTime = keyUpTime - keyDownTime;
-        console.log("Key:", e.key, "Dwell Time:", dwellTime);
-        setDwellTimes((prevDwellTimes) => [...prevDwellTimes, dwellTime]);
         setKeyPressTimes((prevTimes) => {
-          const newTimes = { ...prevTimes };
-          delete newTimes[e.key];
-          return newTimes;
+          const keys = Object.keys(prevTimes);
+          if (keys.length > 0) {
+            const newTimes = { ...prevTimes };
+            delete newTimes[keys[keys.length - 1]]; // Remove the last character's key
+            return newTimes; // Return the updated times
+          }
+          return prevTimes; // Return unchanged if there's nothing to remove
         });
       }
     }
   };
+
+
+
+  // const handleKeyUp = (e) => {
+  //   if (e.ctrlKey && e.key === "Backspace") {
+  //     setDwellTimes([]);
+  //     return;
+  //   } else if (e.key === "Backspace") {
+  //     setDwellTimes((prevDwellTimes) => {
+  //       const newDwellTimes = [...prevDwellTimes];
+  //       newDwellTimes.pop(); // Remove the last dwell time
+  //       return newDwellTimes;
+  //     });
+
+  //     setKeyPressTimes((prevTimes) => {
+  //       const newTimes = { ...prevTimes };
+  //       delete newTimes[e.key]; // Remove the time of the backspace key
+  //       return newTimes;
+  //     });
+  //   } else {
+  //     const keyDownTime = keyPressTimes[e.key];
+  //     if (keyDownTime) {
+  //       const keyUpTime = Date.now();
+  //       const index = dwellTimes.length - 1; // Get the last index
+
+  //       // Calculate dwell time only if there is a previous key press
+  //       if (index > 0) {
+  //         const previousKeyTime = dwellTimes[index - 1]; // Get the time of the previous key
+  //         const dwellTime = keyUpTime - keyDownTime; // Time held down
+  //         console.log("Key:", e.key, "Dwell Time:", dwellTime);
+
+  //         // Store dwell time as the difference from the previous key press
+  //         const newDwellTimes = dwellTimes.map((time, i) => {
+  //           if (i === index) {
+  //             return dwellTime; // Only update the last dwell time
+  //           }
+  //           return time; // Keep other times the same
+  //         });
+
+  //         setDwellTimes(newDwellTimes);
+  //       }
+
+  //       setKeyPressTimes((prevTimes) => {
+  //         const newTimes = { ...prevTimes };
+  //         delete newTimes[e.key]; // Remove the time of the current key
+  //         return newTimes;
+  //       });
+  //     }
+  //   }
+  // };
+
 
   const handlingSpeed = useCallback(
     (typingSpeed) => {
@@ -215,6 +290,8 @@ function Login() {
       // If the login is successful, store the token and navigate to home
       if (responseJson.token) {
         localStorage.setItem("authToken", responseJson.token);
+        localStorage.setItem("username", username);
+        localStorage.setItem("userId", responseJson.userId)
         navigate("/home");
         resetForm()
       }
@@ -254,7 +331,7 @@ function Login() {
             }
             className="input-password"
             onKeyDown={handleKeyDown}
-            onKeyUp={handleKeyUp}
+            // onKeyUp={handleKeyUp}
             placeholder="enter your password"
           />
         </div>

@@ -5,7 +5,7 @@ import bcrypt from 'bcrypt';
 import cors from 'cors'
 import jwt from 'jsonwebtoken'
 import dotenv from 'dotenv';
-import runPrediction from './mlModel.js'
+import axios from 'axios';
 
 dotenv.config();
 
@@ -13,7 +13,9 @@ const app = express()
 app.use(cors())
 app.use(express.json())
 
-let trainUser = ""
+const PYTHON_API_URL = "http://127.0.0.1:5000/predict"
+const PYTHON_TRAINING_API_URL = "http://127.0.0.1:5000/train"
+const PYTHON_INC_TRAINING_API_URL = "http://127.0.0.1:5000/incremental_train"
 
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
@@ -79,6 +81,7 @@ app.post('/register', async (req, res) => {
 })
 
 
+
 // app.post("/login", async (req, res) => {
 //     const { username, password } = req.body;
 
@@ -117,60 +120,152 @@ app.post('/register', async (req, res) => {
 
 
 
+// app.post("/login", async (req, res) => {
+//     const { username, password, dwellTime, elapsedspeed } = req.body;
+
+//     try {
+//         // Find the user by username
+//         const user = await User.findOne({ username });
+
+//         if (!user) {
+//             return res.status(404).json({ message: "User not found" });
+//         }
+
+//         // Check if the password matches
+//         const isMatch = await bcrypt.compare(password, user.password);
+
+//         if (!isMatch) {
+//             return res.status(401).json({ message: "Invalid credentials" });
+//         }
+
+//         // Fetch data of all users for model training
+//         const fetchAllData = await User.find();
+//         console.log("Fetched all user data from database:", fetchAllData);
+
+//         // Check if user data exists and map it
+//         let allData = fetchAllData.map(fetchedUser => ({
+//             dwellTime: fetchedUser.dwellTime || [], // Ensure dwellTime is an array or empty
+//             elapsedspeed: fetchedUser.elapsedspeed || [], // Ensure elapsedspeed is an array or empty
+//             userId: fetchedUser._id  // Track user ID
+//         }));
+
+//         // Log all fetched data for debugging
+//         console.log("All user data prepared for prediction:", allData);
+
+//         // Prepare the current user's updated data
+//         const updatedDwellTime = dwellTime ? user.dwellTime.concat(dwellTime) : user.dwellTime;
+//         const updatedElapsedspeed = elapsedspeed ? user.elapsedspeed.concat(elapsedspeed) : user.elapsedspeed;
+
+//         const userId = user._id
+
+//         // Add the current user's updated data into the allData array for prediction
+//         allData.push({
+//             dwellTime: updatedDwellTime || [], // Ensure it is an array
+//             elapsedspeed: updatedElapsedspeed || [], // Ensure it is an array
+//             userId: user._id  // Current user ID for matching later
+//         });
+
+
+
+//         // console.log("All data after including the current user's updated data:", allData);
+
+//         // // Run the prediction using all data
+//         // const predictions = await trainAndPredictModel(allData);
+//         // console.log("Predictions from the model:", predictions);
+
+//         // // Find the prediction for the current user
+//         // const userPrediction = predictions.find(pred => pred.userId.toString() === user._id.toString());
+//         // console.log("Prediction for user:", userPrediction);
+
+//         // If the prediction is greater than or equal to 0.5, allow login
+//         if (isMatch) {
+//             // Save updated user data
+//             user.dwellTime = updatedDwellTime;
+//             user.elapsedspeed = updatedElapsedspeed;
+//             await user.save();
+
+//             // Generate an authentication token
+//             const token = jwt.sign({ username: user.username }, process.env.SECRET_KEY, { expiresIn: "1h" });
+//             return res.status(200).json({ message: "Login successful", token, userId });
+//         } else {
+//             // Deny login due to suspicious behavior
+//             return res.status(403).json({ message: "Suspicious login behavior detected" });
+//         }
+//     } catch (error) {
+//         console.error("Error during login:", error);
+//         return res.status(500).json({ message: "Server error" });
+//     }
+// });
+
+
+// login route in Node.js
 app.post("/login", async (req, res) => {
-    // const { id } = req.params;
     const { username, password, dwellTime, elapsedspeed } = req.body;
+    console.log("DwellTime :", dwellTime);
+    console.log("elapsedTime :", elapsedspeed);
 
     try {
+
         const user = await User.findOne({ username });
 
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
+        if (!user) return res.status(404).json({ message: "User not found" });
 
         const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
-        if (!isMatch) {
-            return res.status(401).json({ message: "Invalid credentials" });
+        let sessionCount = user.dwellTime ? user.dwellTime.length : 0;
+        if (sessionCount > 50) {
+            try {
+                const userData = {
+                    userID: user._id,
+                    dwellTime: user.dwellTime,
+                    elapsedTime: user.elapsedspeed,
+                };
+
+                console.log("UserData sent for training:", userData);
+
+                await axios.post(PYTHON_TRAINING_API_URL, userData);
+
+                console.log(`Model trained for user ${user._id}`);
+            } catch (error) {
+                console.error("Error training model:", error);
+            }
         }
 
+        if (sessionCount > 50) {
+            const checkUserData = { userID: user._id, dwellTime, elapsedTime: elapsedspeed };
+            const response = await axios.post(PYTHON_API_URL, checkUserData);
 
-        const updatedData = {
-            dwellTime: user.dwellTime,
-            elapsedspeed: user.elapsedspeed,
+            const { is_suspicious, reconstruction_error } = response.data;
+            if (is_suspicious) {
+                return res.status(403).json({ message: "Suspicious login behavior detected", reconstruction_error });
+            }
         }
-
 
         if (dwellTime !== undefined) {
-            // Concatenate the new dwellTime (works for arrays)
-            updatedData.dwellTime = updatedData.dwellTime.concat(dwellTime);
+            user.dwellTime.push(...dwellTime);
         }
-
         if (elapsedspeed !== undefined) {
-            // Concatenate the new elapsed speed
-            updatedData.elapsedspeed = updatedData.elapsedspeed.concat(elapsedspeed);
+            user.elapsedspeed.push(...elapsedspeed);
         }
 
-        // Now run the prediction with updated user data
-        const prediction = await runPrediction(updatedData);
-
-        console.log("this is the prediction : ", prediction)
-
-        if (prediction >= 0.5) {
-            // Grant authentication token and return success
-            await data.save();
-            const token = jwt.sign({ username: updateUser.username }, process.env.SECRET_KEY, { expiresIn: "1h" });
-            return res.status(200).json({ message: "Login successful", token });
+        const updateData = user.save()
+        if (!updateData) {
+            return res.status(404).json({ message: "User not found" });
         } else {
-            // Deny login due to suspicious behavior
-            return res.status(403).json({ message: "Suspicious login behavior detected" });
+            const token = jwt.sign({ username: user.username }, process.env.SECRET_KEY, { expiresIn: "1h" });
+            return res.status(200).json({
+                message: "Login successful",
+                token,
+                userId: user._id,
+            });
         }
+
     } catch (error) {
-        console.log("Error updating user:", error);
+        console.error("Error during login:", error);
         return res.status(500).json({ message: "Server error" });
     }
 });
-
 
 app.post("/train/:id", authenticateToken, async (req, res) => {
     const { id } = req.params
@@ -184,8 +279,6 @@ app.post("/train/:id", authenticateToken, async (req, res) => {
 
     try {
         const isMatch = await bcrypt.compare(password, user.password);
-
-        trainUser = password;
 
         const filteredUser = {
             dwellTime: user.dwellTime,
@@ -202,7 +295,6 @@ app.post("/train/:id", authenticateToken, async (req, res) => {
         console.log(err.message)
         return res.status(500).json({ message: "Server Error" })
     }
-
 })
 
 app.put("/train/:id", authenticateToken, async (req, res) => {
@@ -219,9 +311,45 @@ app.put("/train/:id", authenticateToken, async (req, res) => {
             updateData.elapsedspeed = elapsedspeed;
         }
 
-        if (trainUser.length !== dwellTime[dwellTime.length - 1].length) {
-            return res.status(500).json({ message: "SERVER ERROR : Try ALT + BAKCSPACE and write the password again!!" })
+        let sessionCount = dwellTime ? dwellTime.length : 0;
+        if (sessionCount === 50) {
+            try {
+                const userData = {
+                    userID: id,
+                    dwellTime: dwellTime,
+                    elapsedTime: elapsedspeed,
+                };
+
+                // console.log("UserData sent for training:", userData);
+
+                await axios.post(PYTHON_TRAINING_API_URL, userData);
+
+                console.log(`Model trained for user ${id}`);
+            } catch (error) {
+                console.error("Error training model:", error);
+            }
         }
+
+        if (sessionCount > 50 && sessionCount % 10 === 0) {
+            try {
+                const periodicDwell = dwellTime.slice(-10)
+                const periodicElapsed = elapsedspeed.slice(-10)
+
+                const periodicData = {
+                    userID: id,
+                    dwellTime: periodicDwell,
+                    elapsedTime: periodicElapsed,
+                }
+                console.log("this is the preiodic data : ", periodicData)
+
+                await axios.post(PYTHON_INC_TRAINING_API_URL, periodicData)
+
+            } catch (error) {
+                console.log("error in the line 337 : ", error)
+            }
+        }
+
+        // console.log("this is the updated data in training : ", updateData)
 
         const updateUser = await User.findByIdAndUpdate(id, { $set: updateData }, { new: true });
 

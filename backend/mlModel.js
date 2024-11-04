@@ -1,4 +1,10 @@
 import * as tf from "@tensorflow/tfjs";
+import fs from 'fs';
+import path from 'path';
+
+
+// const __filename = fileURLToPath(import.meta.url);
+// const __dirname = dirname(__filename);
 
 function processDwellTimes(dwellTime) {
     const numAttempts = dwellTime.length;
@@ -129,9 +135,8 @@ async function evaluateModel(model, testInputs, testLabels) {
     console.log(`Test accuracy: ${result[1].dataSync()}`);
 }
 
-async function runPrediction(data) {
+async function trainAndPredictModel(data) {
     const { combinedFeatures } = processData(data);
-
     const labels = data.dwellTime.map(() => 1);
 
     const { trainInputs, testInputs, trainLabels, testLabels } = splitData(combinedFeatures, labels);
@@ -142,14 +147,13 @@ async function runPrediction(data) {
 
     await evaluateModel(model, testInputs, testLabels);
 
+    // Make predictions
     const predictions = model.predict(testInputs);
-
-    const predictionArray = await predictions.array();
-
-    return predictionArray;
+    
+    // Return the predictions
+    return predictions;
 }
 
-
-export default runPrediction
+export default trainAndPredictModel;
 
 
