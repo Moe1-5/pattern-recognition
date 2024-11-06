@@ -108,7 +108,6 @@ function Registeration() {
         </div>
         {/* you may want to add an input for the user email so you can send him through it a second authentication */}
         <div className="input-container">
-          {/* <label className="email"> E-Mail:</label> */}
           <input
             type="mail"
             id="name"
@@ -118,7 +117,6 @@ function Registeration() {
 
         </div>
         <div className="input-container">
-          {/* <label className="email"> E-Mail:</label> */}
           <input
             type="text"
             id="name"
@@ -128,7 +126,6 @@ function Registeration() {
 
         </div>
         <div className="input-container">
-          {/* <label className="password">Password:</label> */}
           <input
             type="password"
             id="password"

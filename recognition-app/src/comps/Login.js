@@ -4,8 +4,6 @@ import { handleTypingSpeed, handleStartTime } from "./CalculateTyping";
 import { useSnackbar } from 'notistack'
 // be careful here with the code
 
-
-
 function Login() {
   const [formError, setFormError] = useState("");
   const [username, setUsername] = useState("");
@@ -65,57 +63,6 @@ function Login() {
     } catch (err) {
       console.log(err.message)
     }
-
-    //   try {
-
-    //     const usersResponse = await fetch("http://localhost:5555/login", {
-    //       method: "POST",
-    //       headers: { "content-type": "application/json" },
-    //       body: JSON.stringify(data),
-    //     });
-    //     if (!usersResponse.ok) {
-    //       const responseJson = await usersResponse.json()
-    //       enqueueSnackbar(`Error: ${responseJson.message}`, { variant: "error" })
-    //       resetForm()
-    //       return
-    //     }
-    //     const users = await usersResponse.json();
-    //     const { user, token } = users
-    //     enqueueSnackbar(`${users.message}`, { variant: 'success' })
-
-    //     localStorage.setItem("authToken", token)
-    //     localStorage.setItem("username", username)
-    //     localStorage.setItem("userId", user.id)
-
-    //     // console.log("this is the important part" + user.id)
-
-    //     if (dwellTimes.length !== password.length) {
-    //       console.log("error in capturing timestamps")
-    //       resetForm()
-    //     }
-    //     // console.log(`this is the dwell Time length ${dwellTimes.length}, and this is the password length ${password.length}`)
-
-    //     handleTypingSpeed(
-    //       e,
-    //       typingStartTime,
-    //       typingEndTime,
-    //       setTypingStartTime,
-    //       setTypingEndTime,
-    //       setPassword
-    //     );
-    //     setFormError("");
-    //     setUsername("");
-    //     setPassword("");
-
-    //     // setTimeout(() => {
-    //     //   navigate("/home");
-    //     // }, 1000);
-
-    //     setUserExists({ ...user });
-
-    //   } catch (err) {
-    //     console.log("Error:", err);
-    //   }
   };
 
   const handleKeyDown = (e) => {
@@ -134,7 +81,6 @@ function Login() {
       const milliseconds = date.getMilliseconds();
       console.log(`Current Time: ${minutes}m ${seconds}s ${milliseconds}ms`);
 
-      // Log the time difference only if there's a previous key press
       if (previousKeyPressTime) {
         const diffMinutes = Math.floor(timeDifference / 60000);
         const diffSeconds = Math.floor((timeDifference % 60000) / 1000);
@@ -142,98 +88,42 @@ function Login() {
 
         console.log(`Time Difference: ${diffMinutes}m ${diffSeconds}s ${diffMilliseconds}ms`);
 
-        // Add the time difference to the dwellTime state
         setDwellTimes((prevDwellTimes) => {
           return [...prevDwellTimes, timeDifference];
         });
       }
 
-      // Store the timestamp for the current key press
       setKeyPressTimes((prevTimes) => ({
         ...prevTimes,
         [e.key]: currentTime,
       }));
     }
 
-    // Handle Backspace and Ctrl + Backspace
     if (e.key === 'Backspace') {
       if (e.ctrlKey) {
-        // Clear all dwell times if Ctrl + Backspace is pressed
         setDwellTimes([]);
         console.log('All time differences cleared!');
-        setKeyPressTimes({}); // Clear all key press times
+        setKeyPressTimes({});
       } else {
-        // Remove the last dwell time if it exists
         setDwellTimes((prevDwellTimes) => {
           if (prevDwellTimes.length > 0) {
-            return prevDwellTimes.slice(0, -1); // Remove the last dwell time
+            return prevDwellTimes.slice(0, -1);
           }
-          return prevDwellTimes; // Return unchanged if there's nothing to remove
+          return prevDwellTimes;
         });
 
         setKeyPressTimes((prevTimes) => {
           const keys = Object.keys(prevTimes);
           if (keys.length > 0) {
             const newTimes = { ...prevTimes };
-            delete newTimes[keys[keys.length - 1]]; // Remove the last character's key
-            return newTimes; // Return the updated times
+            delete newTimes[keys[keys.length - 1]];
+            return newTimes;
           }
-          return prevTimes; // Return unchanged if there's nothing to remove
+          return prevTimes;
         });
       }
     }
   };
-
-
-
-  // const handleKeyUp = (e) => {
-  //   if (e.ctrlKey && e.key === "Backspace") {
-  //     setDwellTimes([]);
-  //     return;
-  //   } else if (e.key === "Backspace") {
-  //     setDwellTimes((prevDwellTimes) => {
-  //       const newDwellTimes = [...prevDwellTimes];
-  //       newDwellTimes.pop(); // Remove the last dwell time
-  //       return newDwellTimes;
-  //     });
-
-  //     setKeyPressTimes((prevTimes) => {
-  //       const newTimes = { ...prevTimes };
-  //       delete newTimes[e.key]; // Remove the time of the backspace key
-  //       return newTimes;
-  //     });
-  //   } else {
-  //     const keyDownTime = keyPressTimes[e.key];
-  //     if (keyDownTime) {
-  //       const keyUpTime = Date.now();
-  //       const index = dwellTimes.length - 1; // Get the last index
-
-  //       // Calculate dwell time only if there is a previous key press
-  //       if (index > 0) {
-  //         const previousKeyTime = dwellTimes[index - 1]; // Get the time of the previous key
-  //         const dwellTime = keyUpTime - keyDownTime; // Time held down
-  //         console.log("Key:", e.key, "Dwell Time:", dwellTime);
-
-  //         // Store dwell time as the difference from the previous key press
-  //         const newDwellTimes = dwellTimes.map((time, i) => {
-  //           if (i === index) {
-  //             return dwellTime; // Only update the last dwell time
-  //           }
-  //           return time; // Keep other times the same
-  //         });
-
-  //         setDwellTimes(newDwellTimes);
-  //       }
-
-  //       setKeyPressTimes((prevTimes) => {
-  //         const newTimes = { ...prevTimes };
-  //         delete newTimes[e.key]; // Remove the time of the current key
-  //         return newTimes;
-  //       });
-  //     }
-  //   }
-  // };
-
 
   const handlingSpeed = useCallback(
     (typingSpeed) => {
@@ -244,7 +134,6 @@ function Login() {
         console.log(userExists.speed);
         console.log("dwellTimes2", dwellTimes);
         if (dwellTimes && dwellTimes.length > 0) {
-          //you mey need only these with the user.
           userExists.elapsedspeed.push(typingSpeed);
           userExists.dwellTime.push(dwellTimes);
           resetForm()
@@ -340,9 +229,6 @@ function Login() {
           <button type="submit" className="login-btn">
             Login
           </button>
-          <p>{typingSpeed}</p>
-          <p>{`starting:${typingStartTime}`}</p>
-          <p>{`Ending:${typingEndTime}`}</p>
           <NavLink to="/register" className="new-link">
             New? create account
           </NavLink>

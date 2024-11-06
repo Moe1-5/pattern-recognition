@@ -80,125 +80,6 @@ app.post('/register', async (req, res) => {
     }
 })
 
-
-
-// app.post("/login", async (req, res) => {
-//     const { username, password } = req.body;
-
-//     try {
-//         const user = await User.findOne({ username });
-
-//         if (!user) {
-//             return res.status(404).json({ message: "User not found" });
-//         }
-
-//         const isMatch = await bcrypt.compare(password, user.password);
-
-//         if (!isMatch) {
-//             return res.status(401).json({ message: "Invalid credentials" });
-//         }
-
-//         const filteredUser = {
-//             id: user.id,
-//             dwellTime: user.dwellTime || [],
-//             elapsedspeed: user.elapsedspeed || []
-//         };
-
-//         // Remove the initial prediction here. It will be handled in the PUT request.
-
-//         // Send back a success response for the login (without token generation yet)
-//         return res.status(200).json({
-//             message: "Login successful, awaiting behavior data for authentication",
-//             user: filteredUser
-//         });
-
-//     } catch (error) {
-//         console.error(error);
-//         return res.status(500).json({ message: "Server error" });
-//     }
-// });
-
-
-
-// app.post("/login", async (req, res) => {
-//     const { username, password, dwellTime, elapsedspeed } = req.body;
-
-//     try {
-//         // Find the user by username
-//         const user = await User.findOne({ username });
-
-//         if (!user) {
-//             return res.status(404).json({ message: "User not found" });
-//         }
-
-//         // Check if the password matches
-//         const isMatch = await bcrypt.compare(password, user.password);
-
-//         if (!isMatch) {
-//             return res.status(401).json({ message: "Invalid credentials" });
-//         }
-
-//         // Fetch data of all users for model training
-//         const fetchAllData = await User.find();
-//         console.log("Fetched all user data from database:", fetchAllData);
-
-//         // Check if user data exists and map it
-//         let allData = fetchAllData.map(fetchedUser => ({
-//             dwellTime: fetchedUser.dwellTime || [], // Ensure dwellTime is an array or empty
-//             elapsedspeed: fetchedUser.elapsedspeed || [], // Ensure elapsedspeed is an array or empty
-//             userId: fetchedUser._id  // Track user ID
-//         }));
-
-//         // Log all fetched data for debugging
-//         console.log("All user data prepared for prediction:", allData);
-
-//         // Prepare the current user's updated data
-//         const updatedDwellTime = dwellTime ? user.dwellTime.concat(dwellTime) : user.dwellTime;
-//         const updatedElapsedspeed = elapsedspeed ? user.elapsedspeed.concat(elapsedspeed) : user.elapsedspeed;
-
-//         const userId = user._id
-
-//         // Add the current user's updated data into the allData array for prediction
-//         allData.push({
-//             dwellTime: updatedDwellTime || [], // Ensure it is an array
-//             elapsedspeed: updatedElapsedspeed || [], // Ensure it is an array
-//             userId: user._id  // Current user ID for matching later
-//         });
-
-
-
-//         // console.log("All data after including the current user's updated data:", allData);
-
-//         // // Run the prediction using all data
-//         // const predictions = await trainAndPredictModel(allData);
-//         // console.log("Predictions from the model:", predictions);
-
-//         // // Find the prediction for the current user
-//         // const userPrediction = predictions.find(pred => pred.userId.toString() === user._id.toString());
-//         // console.log("Prediction for user:", userPrediction);
-
-//         // If the prediction is greater than or equal to 0.5, allow login
-//         if (isMatch) {
-//             // Save updated user data
-//             user.dwellTime = updatedDwellTime;
-//             user.elapsedspeed = updatedElapsedspeed;
-//             await user.save();
-
-//             // Generate an authentication token
-//             const token = jwt.sign({ username: user.username }, process.env.SECRET_KEY, { expiresIn: "1h" });
-//             return res.status(200).json({ message: "Login successful", token, userId });
-//         } else {
-//             // Deny login due to suspicious behavior
-//             return res.status(403).json({ message: "Suspicious login behavior detected" });
-//         }
-//     } catch (error) {
-//         console.error("Error during login:", error);
-//         return res.status(500).json({ message: "Server error" });
-//     }
-// });
-
-
-// login route in Node.js
 app.post("/login", async (req, res) => {
     const { username, password, dwellTime, elapsedspeed } = req.body;
     console.log("DwellTime :", dwellTime);
@@ -214,7 +95,7 @@ app.post("/login", async (req, res) => {
         if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
         let sessionCount = user.dwellTime ? user.dwellTime.length : 0;
-        if (sessionCount > 50) {
+        if (sessionCount === 50 || sessionCount > 50 && sessionCount % 50 === 0) {
             try {
                 const userData = {
                     userID: user._id,
@@ -312,7 +193,7 @@ app.put("/train/:id", authenticateToken, async (req, res) => {
         }
 
         let sessionCount = dwellTime ? dwellTime.length : 0;
-        if (sessionCount === 50) {
+        if (sessionCount === 50 || sessionCount > 50 && sessionCount % 50 === 0) {
             try {
                 const userData = {
                     userID: id,

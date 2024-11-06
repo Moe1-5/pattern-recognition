@@ -14,11 +14,11 @@ app = Flask(__name__)
 
 USER_MODELS_DIR = "Mymodel/users"
 
-user_error_history = {}
-
-THRESHOLD_WINDOW_SIZE = 10
+THRESHOLD_WINDOW_SIZE = 20
 THRESHOLD_MULTIPLIER = 1.2
-BASELINE_THRESHOLD = 0.1
+BASELINE_THRESHOLD = 1.0
+
+user_error_history = {}
 
 def load_user_model(user_id):
     model_path = os.path.join(USER_MODELS_DIR, f"{user_id}_autoencoder_model.keras")
@@ -28,7 +28,7 @@ def load_user_model(user_id):
         return None, None
     
     autoencoder = tf.keras.models.load_model(model_path)
-    scaler = joblib.load(scaler_path)  # Load the saved scaler
+    scaler = joblib.load(scaler_path)
     
     return autoencoder, scaler
 
@@ -47,49 +47,30 @@ def process_data(dwell_time, elapsed_time, scaler):
     print("this is the dwellTime in the process_user_data : ", dwell_time)
     print("this is the elapsedspeed in the process_user_data : ", elapsed_time)
 
-    # Combine dwell and elapsed time as pairs
     combined_features = np.array([[dwell, speed] for dwell, speed in zip(dwell_time, elapsed_time)])
     print("Combined features shape before scaling:", combined_features.shape)
 
-    # Scale the combined features without reshaping to (1, -1)
     standardized_features = scaler.transform(combined_features)
     print("Processed standardized features:", standardized_features)
 
     return standardized_features
 
-max_attempts = 5
-suspicious_attempts = {}
-
-def calculate_dynamic_threshold(user_id, new_error, is_legitimate):
+def calculate_dynamic_threshold(user_id, new_error, adjustment_factor=0.1):
     if user_id not in user_error_history:
         user_error_history[user_id] = deque(maxlen=THRESHOLD_WINDOW_SIZE)
-
-    # Only add errors from legitimate logins to avoid threshold adjustment based on suspicious activity
-    if is_legitimate:
-        user_error_history[user_id].append(new_error)
     
+    user_error_history[user_id].append(new_error)
     avg_error = np.mean(user_error_history[user_id])
     
-    if len(user_error_history[user_id]) == THRESHOLD_WINDOW_SIZE:
-        dynamic_threshold = avg_error * THRESHOLD_MULTIPLIER
-    else:
-        dynamic_threshold = max(avg_error * THRESHOLD_MULTIPLIER, BASELINE_THRESHOLD)
-
+    dynamic_threshold = max(BASELINE_THRESHOLD * (1 - adjustment_factor), avg_error)
+    print(f"Updated dynamic threshold: {dynamic_threshold}")
     return dynamic_threshold
 
 def predict_suspicious_login(autoencoder, new_login_data, threshold):
-    print(f"New login data shape: {new_login_data.shape}")
-    print(f"New login data: {new_login_data}")
-
     reconstructions = autoencoder.predict(new_login_data)
     reconstruction_errors = np.mean(np.abs(reconstructions - new_login_data), axis=1)
-    
     is_suspicious = reconstruction_errors > threshold
-    
     return is_suspicious, reconstruction_errors
-
-suspicious_attempts = defaultdict(int)
-max_attempts = 5
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -115,28 +96,14 @@ def predict():
 
     standardized_features = process_user_data(dwell_time, elapsed_time, scaler)
 
-    # Predict suspicious login
     _, reconstruction_errors = predict_suspicious_login(autoencoder, standardized_features, threshold=0.9)
     reconstruction_error = reconstruction_errors[0]
 
-    # Calculate dynamic threshold only based on legitimate attempts
-    dynamic_threshold = calculate_dynamic_threshold(user_id, reconstruction_error, is_legitimate=(suspicious_attempts[user_id] < max_attempts))
+    dynamic_threshold = calculate_dynamic_threshold(user_id, reconstruction_error)
 
-    # Determine if the attempt is suspicious
+    print("this is the dynamic threshold :", dynamic_threshold)
+
     is_suspicious = reconstruction_error > dynamic_threshold
-
-    if is_suspicious:
-        suspicious_attempts[user_id] += 1
-    else:
-        suspicious_attempts[user_id] = 0  # Reset counter on legitimate login
-
-    # Check if maximum attempts have been exceeded
-    if suspicious_attempts[user_id] >= max_attempts:
-        # Send alert message
-        return jsonify({
-            "message": "You have tried more than 5 times. Check your email for further instructions.",
-            "userID": user_id
-        }), 429
 
     print(f"Reconstruction error: {reconstruction_error}")
 
@@ -180,11 +147,6 @@ def train_model():
     dwell_times = np.array(dwell_times, dtype=object) 
     elapsed_times = np.array(elapsed_times, dtype=object)
     user_id = np.array(user_id, dtype=object)
-
-    print ("this is the data sent to the model dwell : ", dwell_times)
-    print ("this is the data sent to the model elapsed : ", elapsed_times)
-    print ("this is the data sent to the model : ", user_id)
-
     
     main({
         "dwellTime": dwell_times,
@@ -202,29 +164,22 @@ def incremental_train():
     fetched_dwell_times = data.get('dwellTime')
     fetched_elapsed_times = data.get('elapsedTime')
 
-    # Check for missing fields in the data
     if not fetched_user_id or not fetched_dwell_times or not fetched_elapsed_times:
         return jsonify({"error": "Missing 'userID', 'dwellTime', or 'elapsedTime' in request"}), 400
     
-    # Flatten dwell and elapsed times if they are nested arrays or lists
     dwell_times = np.array(fetched_dwell_times).flatten()
     elapsed_times = np.array(fetched_elapsed_times).flatten()
     
-    # Load the user's model and scaler
     autoencoder, scaler = load_user_model(fetched_user_id)
     if autoencoder is None or scaler is None:
         return jsonify({"error": f"No model found for userID: {fetched_user_id}"}), 404
 
-    # Recompile the model with a new optimizer instance to prevent reuse issues
     autoencoder.compile(optimizer='adam', loss= MeanSquaredError())
     
-    # Process the data into standardized features
     standardized_features = process_data(dwell_times, elapsed_times, scaler)
 
-    # Incrementally train the model with the new standardized features
     autoencoder.fit(standardized_features, standardized_features, epochs=1, verbose=1)
 
-    # Save the updated model
     model_path = os.path.join(USER_MODELS_DIR, f"{fetched_user_id}_autoencoder_model.keras")
     autoencoder.save(model_path)
 

@@ -1,5 +1,3 @@
-// over look this entire code if not needed delete it replace it with other one 
-// also after finishing delete the logs 
 export function handleStartTime(e, typingStartTime, setTypingStartTime, setPassword) {
     setPassword(e.target.value)
 
